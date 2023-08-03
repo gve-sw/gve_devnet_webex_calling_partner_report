@@ -1,0 +1,12 @@
+# If new to Windows Task Scheduler, here are some guides to get you started and explain the above command:
+# https://www.jcchouinard.com/python-automation-using-task-scheduler/
+
+# Steps:
+# 1.) Search for 'Task Scheduler'
+# 2.) Go to Actions > Create Task...
+# 3.) Provide a name and description
+# 4.) Run `pwd` and `where python` to get absolute paths to script files and python binary
+# 4.) Create a New Action > provide the path to python binary, add the path to the python script as an argument > Save
+# 5.) Set the trigger (day, frequency, time, etc.)
+
+# NOTE: it's recommened to run the task manually through Windows Scheduler first to ensure it works. Check back for errors if no results appear after the scheduled time.
