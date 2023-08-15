@@ -86,18 +86,25 @@ CCW_INTEGRATION = False
 CCW_CLIENT_ID = ""
 CCW_CLIENT_SECRET = ""
 ```
-4. If you'd like to leverage the email capability, ensure `SEND_EMAIL` is set to True. Add the Email Username and Password  `config.py` from the prerequisites section (if relevant).
+4. Enter a file path where the report file should be saved. If left blank, the report file will be saved to the default `./reports/{report_name}` path in the current directory. Select the format of the report file (CSV or Excel). The default format is an Excel File with 3 sheets, but a zip of 3 CSV files is also supported.
+```python
+DESTINATION_PATH = ""
+CSV_FORMAT = False
+```
+5. If you'd like to leverage the email capability, ensure `SEND_EMAIL` is set to True. Add the Email Username and Password  `config.py` from the prerequisites section for the relevant Email provider (if enabled).
 ```python
 SEND_EMAIL = False
+
+# Outlook/GMail:
 EMAIL_USERNAME = ""
 EMAIL_PASSWORD = ""
 ```
-5. Add the list of 1 or more Email Recipients to `config.py` from the prerequisites section (if relevant).
+6. Add the list of 1 or more Email Recipients to `config.py` from the prerequisites section (if relevant).
 ```python
 RECIPIENTS = ['example@email.com']
 ```
-6. Set up a Python virtual environment. Make sure Python 3 is installed in your environment, and if not, you may download Python [here](https://www.python.org/downloads/). Once Python 3 is installed in your environment, you can activate the virtual environment with the instructions found [here](https://docs.python.org/3/tutorial/venv.html).
-7. Install the requirements with `pip3 install -r requirements.txt`
+7. Set up a Python virtual environment. Make sure Python 3 is installed in your environment, and if not, you may download Python [here](https://www.python.org/downloads/). Once Python 3 is installed in your environment, you can activate the virtual environment with the instructions found [here](https://docs.python.org/3/tutorial/venv.html).
+8. Install the requirements with `pip3 install -r requirements.txt`
 
 ## Usage
 To generate a report, there are 2 important scripts: `app.py` and `report.py`.
@@ -150,6 +157,8 @@ The script will generate the report (using the `calling_report_template.xlsx` as
 If the email functionality is enabled, all recipients will receive a copy of the report. The email will look like:
 
 ![](IMAGES/example_email.png)
+
+Any report errors encountered (ex: 403 API Response) are written to a date-stamped log file in the `logs` folder. Please consult the relevant log if data is missing from the report.
 
 **Optional**: A cronjob (Linux) can be created to periodically run `report.py`. Please consult `crontab.txt` for more information.
 

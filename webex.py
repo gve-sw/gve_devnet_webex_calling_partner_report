@@ -17,6 +17,8 @@ __author__ = "Mark Orszycki <morszyck@cisco.com>, Trevor Maco <tmaco@cisco.com>"
 __copyright__ = "Copyright (c) 2023 Cisco and/or its affiliates."
 __license__ = "Cisco Sample Code License, Version 1.1"
 
+import base64
+
 import requests
 from datetime import datetime
 from rich.console import Console
@@ -24,13 +26,15 @@ from rich.console import Console
 import config
 
 base_url = 'https://webexapis.com/v1/'
-console = Console()
 
 
 class WebexCallingInfo:
-    def __init__(self, token, id, displayName):
+    def __init__(self, token, id, displayName, console, error_logger):
         self.headers = {'Authorization': f'Bearer {token}'}
+        self.console = console if console else Console()
+        self.error_logger = error_logger if error_logger else None
         self.id = id
+        self.org_id = None
         self.displayName = displayName
         self.trunks = []
         self.professional_licenses = {}
@@ -54,14 +58,32 @@ class WebexCallingInfo:
         if response.ok:
             return response.json()
         else:
-            console.print("\n[red]Request FAILED: " + str(response.status_code))
-            console.print(response.text)
+            self.console.print("\n[red]Request FAILED: [/]" + str(response.status_code))
+            self.console.print(response.text)
+
+            # Write Errors to File
+            if self.error_logger:
+                self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
+                self.error_logger.error(response.text)
+
             return None
 
-    def get_trunks(self):
+    def get_org_id(self):
+        """
+        Get Webex Control Hub Org id (different from API Org ID). ID is base64 encoded, with additional encoded
+        information.
+        """
+        # Decode the id from base64 (add 2 = signs to ensure divisibility by 4, non-validate param cuts off excess =)
+        decoded_id = base64.b64decode(self.id + '==').decode('utf-8')
+
+        # Split the string and retrieve the organization number
+        self.org_id = decoded_id.split('/')[-1]
+
+    def get_trunks(self, progress=None):
         """
         Get a list of configured Trunks, retrieve Route Groups associated with Trunks as well
         """
+
         # Get a List of configured Trunks
         trunk_url = "telephony/config/premisePstn/trunks"
         trunk_params = {'orgId': self.id}
@@ -70,6 +92,10 @@ class WebexCallingInfo:
 
         if response:
             trunks = response['trunks']
+
+            if progress:
+                # Optional progress display
+                task = progress.add_task("Find Trunks (and Route Groups)", total=len(trunks), transient=True)
 
             # Add Trunks to list, determine if trunk is attached to Route Group
             for trunk in trunks:
@@ -95,6 +121,9 @@ class WebexCallingInfo:
                     trunk_info['rg_names'] = [rg['name'] for rg in RGs]
 
                     self.trunks.append(trunk_info)
+
+                if progress:
+                    progress.update(task, advance=1)
 
     def get_license_counts(self):
         """
@@ -206,11 +235,21 @@ class WebexCallingInfo:
                         self.sub_end_dates.append('Unknown')
 
                 else:
-                    console.print("\n[red]Request FAILED: " + str(response.status_code))
-                    console.print(response.text)
+                    self.console.print("[red]Request FAILED: " + str(response.status_code))
+                    self.console.print(response.text)
+
+                    # Write Errors to File
+                    if self.error_logger:
+                        self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
+                        self.error_logger.error(response.text)
         else:
-            console.print("\n[red]Request FAILED: " + str(response.status_code))
-            console.print(response.text)
+            self.console.print("[red]Request FAILED: " + str(response.status_code))
+            self.console.print(response.text)
+
+            # Write Errors to File
+            if self.error_logger:
+                self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
+                self.error_logger.error(response.text)
 
     def get_phone_numbers(self):
         """
@@ -265,10 +304,15 @@ class WebexCallingInfo:
                 # Append to list
                 self.phone_numbers.append(number_info)
 
-    def get_outbound_permissions(self):
+    def get_outbound_permissions(self, progress=None):
         """
         Get outbound calling permissions for each user associated to a phone number
         """
+        if progress:
+            # Optional progress display
+            task = progress.add_task("Find Outbound Calling Permissions",
+                                                              total=len(self.phone_numbers), transient=True)
+
         # Get the outbound call permissions for each user
         for phone_number in self.phone_numbers:
             # If the phone number is assigned to a user, grab the permissions by user id
@@ -334,10 +378,17 @@ class WebexCallingInfo:
                     # Store settings in dictionary, with key of owner id for easy lookup
                     self.outgoing_permissions[phone_number['owner_id']] = number_permissions
 
-    def get_intercept_settings(self):
+            if progress:
+                progress.update(task, advance=1)
+
+    def get_intercept_settings(self, progress=None):
         """
         Get outbound call intercept settings for each user associated to a phone number
         """
+        if progress:
+            # Optional progress display
+            task = progress.add_task("Find Call Intercept Settings",
+                                                              total=len(self.phone_numbers), transient=True)
         # Get Outbound Intercept settings for users
         for phone_number in self.phone_numbers:
             # If the phone number is assigned to a user, grab the permissions by user id
@@ -365,3 +416,6 @@ class WebexCallingInfo:
 
                     # Store settings in dictionary, with key of owner id for easy lookup
                     self.intercept_settings[phone_number['owner_id']] = current_intercept_settings
+
+            if progress:
+                progress.update(task, advance=1)

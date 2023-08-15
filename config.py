@@ -10,7 +10,8 @@ CCW_CLIENT_ID = ""
 CCW_CLIENT_SECRET = ""
 
 # Report Section
-REPORT_TEMPLATE = 'calling_report_template.xlsx'
+DESTINATION_PATH = ""
+CSV_FORMAT = False
 
 # Email Section
 SEND_EMAIL = False

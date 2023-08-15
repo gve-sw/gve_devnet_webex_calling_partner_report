@@ -23,6 +23,7 @@ import shutil
 import smtplib
 import sys
 import time
+import logging
 from datetime import date
 from email import encoders
 from email.mime.base import MIMEBase
@@ -42,7 +43,36 @@ from webex import WebexCallingInfo
 # Refreshing token URL
 TOKEN_URL = 'https://api.ciscospark.com/v1/access_token'
 
+REPORT_TEMPLATE = "calling_report_template.xlsx"
+
+# Rich console instance
 console = Console()
+
+# Specify list of Org names to specifically process (only these orgs will be processed)
+ORGS = []
+
+
+def custom_logger(date):
+    """
+    Define custom logger for each report run, writes logs to date stamped file. Creates or returns existing logger. Logs for the current day overwritten with each run!
+    :param date: Report date
+    :return: logger instance
+    """
+    logger = logging.getLogger(date)
+
+    if not logger.handlers:
+        logFile = os.path.join('./logs/', 'report_errors_' + date + '.log')
+
+        os.makedirs(os.path.dirname(logFile), exist_ok=True)
+
+        # Create logger
+        my_handler = logging.FileHandler(filename=logFile, mode='w')
+        my_handler.setLevel(logging.INFO)
+        logger.addHandler(my_handler)
+
+        logger.setLevel(logging.INFO)
+
+    return logger
 
 
 def refresh_token(tokens):
@@ -82,7 +112,7 @@ def get_customer_orgs(token):
 
     response = requests.get(url=target_url, headers={'Authorization': f'Bearer {token}'})
 
-    if response.ok:
+    if response.status_code == 200:
         orgs = response.json()['items']
 
         console.print(f'Found {len(orgs) - 1 if len(orgs) > 1 else len(orgs)} org(s)!')
@@ -93,41 +123,20 @@ def get_customer_orgs(token):
         return None
 
 
-def create_report_file():
-    """
-    Create temporary excel report file (written to and sent via email before deletion), the file is a copy of the
-    template
-    :return: Path to temporary file
-    """
-    # Create destination file, include date stamp
-    current_date = date.today()
-    date_string = current_date.strftime("%m-%d-%Y")
-
-    # Include the date in the file name
-    destination_file = f"calling_report_{date_string}.xlsx"
-
-    # Create New Report based on template
-    shutil.copy(config.REPORT_TEMPLATE, destination_file)
-
-    console.print(f'New report file created: `[blue]{destination_file}[/]`')
-
-    return destination_file
-
-
-def populate_df(calling_info, report_number, df):
+def populate_df(calling_info, report_number):
     """
     Populate dataframe with information gathered from script, data is written to specific DF depending on report,
     DF is ultimately written to Excel file
     :param calling_info: Webex Calling info gathered from script
     :param report_number: Report number which determines the type of report
-    :param df: Report Dataframe
     :return: Report DF populated with new information from script per org
     """
     rows = []
     if report_number == 1:
-        df_row = {'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.id,
+        df_row = {'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.org_id,
                   'Sub-Ref Id(s)': ', '.join(calling_info.sub_ids),
-                  'Recent Subscription Start Date': ', '.join(calling_info.sub_start_dates), 'Recent Subscription End Date': ', '.join(calling_info.sub_end_dates), 'Booked (TOTAL)': '',
+                  'Recent Subscription Start Date': ', '.join(calling_info.sub_start_dates),
+                  'Recent Subscription End Date': ', '.join(calling_info.sub_end_dates), 'Booked (TOTAL)': '',
                   'Booked Professional Licenses': '', 'Booked Workspaces': '',
                   'Provisioned (TOTAL)': '', 'Provisioned Professional Licenses': '', 'Provisioned Workspaces': ''}
 
@@ -154,19 +163,20 @@ def populate_df(calling_info, report_number, df):
     elif report_number == 2:
         if len(calling_info.phone_numbers) == 0:
             # No numbers present in org, append blank line
-            rows.append(pd.DataFrame([{'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.id,
-                                       'Phone Number': '', 'Main Number': '', 'Extension': '', 'Location': '',
-                                       'Assigned to': '', 'Status': '',
-                                       'Outgoing Call Permissions': '', 'Internal': '',
-                                       'Toll-free': '', 'National': '', 'International': '',
-                                       'Operator Assistance': '', 'Chargeable Directory Assistance': '',
-                                       'Special Services I': '', 'Special Services II': '', 'Premium Service I': '',
-                                       'Premium Services II': '', 'Call Intercept': '',
-                                       'Outgoing Intercept Permissions': ''}]))
+            rows.append(
+                pd.DataFrame([{'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.org_id,
+                               'Phone Number': '', 'Main Number': '', 'Extension': '', 'Location': '',
+                               'Assigned to': '', 'Status': '',
+                               'Outgoing Call Permissions': '', 'Internal': '',
+                               'Toll-free': '', 'National': '', 'International': '',
+                               'Operator Assistance': '', 'Chargeable Directory Assistance': '',
+                               'Special Services I': '', 'Special Services II': '', 'Premium Service I': '',
+                               'Premium Services II': '', 'Call Intercept': '',
+                               'Outgoing Intercept Permissions': ''}]))
         else:
             # Iterate through list of numbers, append to DF
             for number in calling_info.phone_numbers:
-                df_row = {'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.id,
+                df_row = {'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.org_id,
                           'Phone Number': number['phone_number'], 'Main Number': number['main_number'],
                           'Extension': number['extension'], 'Location': number['location'],
                           'Assigned to': number['owner'], 'Status': number['status'],
@@ -205,17 +215,18 @@ def populate_df(calling_info, report_number, df):
     elif report_number == 3:
         if len(calling_info.trunks) == 0:
             # No trunks present in org
-            rows.append(pd.DataFrame([{'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.id,
-                                       'TRUNK': '', 'ROUTE GROUP NAME': ''}]))
+            rows.append(
+                pd.DataFrame([{'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.org_id,
+                               'TRUNK': '', 'ROUTE GROUP NAME': ''}]))
         else:
             # Iterate through list of trunks
             for trunk in calling_info.trunks:
                 rows.append(
-                    pd.DataFrame([{'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.id,
+                    pd.DataFrame([{'Customer Name': calling_info.displayName, 'Customer Org ID': calling_info.org_id,
                                    'TRUNK': trunk['name'], 'ROUTE GROUP NAME': ','.join(trunk['rg_names'])}]))
 
     # Append new row(s)
-    df = pd.concat(rows + [df], ignore_index=True, sort=False)
+    df = pd.concat(rows, ignore_index=True, sort=False)
     return df
 
 
@@ -237,7 +248,7 @@ def send_email_with_attachment(attachment_path):
     msg['Subject'] = subject
 
     message = 'This is an automated message containing information about managed Webex Calling Customers. Please see ' \
-              'the attached Excel Report for more information. '
+              'the attached Report for more information. '
     # Add the message body
     msg.attach(MIMEText(message, 'plain'))
 
@@ -246,7 +257,7 @@ def send_email_with_attachment(attachment_path):
     part = MIMEBase('application', 'octet-stream')
     part.set_payload(attachment.read())
     encoders.encode_base64(part)
-    part.add_header('Content-Disposition', f'attachment; filename="{attachment_path}"')
+    part.add_header('Content-Disposition', f'attachment; filename="{attachment_path.split("/")[-1]}"')
     msg.attach(part)
 
     # Establish the SMTP connection and send the email
@@ -264,18 +275,25 @@ def generate_calling_report(token):
     write dataframe(s) to report file
     :param token: Webex tokens
     """
+    # Define customer error logger
+    current_date = date.today()
+    date_string = current_date.strftime("%m-%d-%Y")
+    error_logger = custom_logger(date_string)
+
     console.print(Panel.fit("Generate Webex Calling Report(s)", title="Step 2"))
-
-    # Generate New Report file (date stamped)
-    destination_file = create_report_file()
-
-    # Read in sheets from Report File, prepare DFs
-    df_report1 = pd.read_excel(destination_file, sheet_name='Report #1', na_filter=False)
-    df_report2 = pd.read_excel(destination_file, sheet_name='Report #2', na_filter=False)
-    df_report3 = pd.read_excel(destination_file, sheet_name='Report #3', na_filter=False)
 
     # Get a list of customer orgs
     orgs = get_customer_orgs(token)
+
+    if not orgs:
+        console.print('[red]No customer orgs found, exiting...[/]')
+        return
+
+    # Selectively process orgs (if relevant - useful for debugging or selective processing)
+    if len(ORGS) > 0:
+        orgs = [org for org in orgs if org['displayName'] in ORGS]
+
+    # Org count - 1 because partner org itself is ignored (see config.py)
     orgs_count = len(orgs) - 1 if len(orgs) > 1 else len(orgs)
 
     with Progress() as progress:
@@ -288,15 +306,22 @@ def generate_calling_report(token):
                 continue
 
             # Initialize object which will hold org-wide calling info for generating various reports
-            calling_info = WebexCallingInfo(token, org['id'], org['displayName'])
+            calling_info = WebexCallingInfo(token, org['id'], org['displayName'], progress.console, error_logger)
+
+            # Get Webex Org Id
+            calling_info.get_org_id()
+
             progress.console.print(
-                "Processing Org: [blue]'{}'[/] ({} of {})".format(org['displayName'], str(counter), orgs_count))
+                "\nProcessing Org: [blue]'{}'[/] ({} of {})".format(org['displayName'], str(counter), orgs_count))
+            error_logger.info("\nProcessing Org: {} ({} of {})".format(org['displayName'], str(counter), orgs_count))
 
             # Retrieve various Webex Calling Info for each report, stored within object for particular Org
             ### REPORT 1 ###
-            progress.console.print("- Generating [blue]Report 1[/]:")
+            progress.console.print("\n- Generating [blue]Report 1[/]:")
+            error_logger.info("\n- Generating Report 1:")
 
             # Gather Professional and Workspace License Information
+            error_logger.info("-- License Counts:")
             calling_info.get_license_counts()
             if len(calling_info.professional_licenses) == 0 and len(calling_info.workspace_licenses) == 0:
                 progress.console.print("-- [red]No Webex Calling License information found.[/]")
@@ -311,17 +336,23 @@ def generate_calling_report(token):
 
             # Gather License Subscription Information (Start and End Date)
             if config.CCW_INTEGRATION:
+                error_logger.info("-- License Subscription Dates:")
                 calling_info.get_license_dates()
                 if len(calling_info.sub_start_dates) == 0 and len(calling_info.sub_end_dates) == 0:
                     progress.console.print("-- [red]Unable to obtain data from CCW API. Skipping...[/]")
+                else:
+                    progress.console.print("-- Found the following [green]License Start and License End dates[/]: "
+                                           f"{calling_info.sub_start_dates}, {calling_info.sub_end_dates}")
 
             # Populate DF with report info
-            df_report1 = populate_df(calling_info, 1, df_report1)
+            df_report1 = populate_df(calling_info, 1)
 
             ### REPORT 2 ###
-            progress.console.print("- Generating [blue]Report 2[/]:")
+            progress.console.print("\n- Generating [blue]Report 2[/]:")
+            error_logger.info("\n- Generating Report 2:")
 
             # Gather Users and Phone Numbers
+            error_logger.info("-- Phone Numbers:")
             calling_info.get_phone_numbers()
             if len(calling_info.phone_numbers) == 0:
                 progress.console.print("-- [red]No Webex Calling Phone Numbers provisioned.[/]")
@@ -330,21 +361,25 @@ def generate_calling_report(token):
                     f"-- Found [green]Webex Phone Numbers[/]: {[number['phone_number'] for number in calling_info.phone_numbers if number['phone_number'] != '']}")
 
                 # Gather User Outbound Calling Permissions
-                calling_info.get_outbound_permissions()
+                error_logger.info("--- Outbound Calling Permissions:")
+                calling_info.get_outbound_permissions(progress)
                 progress.console.print(f"--- Found [green]Outbound Permissions[/] for each number")
 
                 # Gather User Outbound Calling Intercept Settings
-                calling_info.get_intercept_settings()
+                error_logger.info("--- Call Intercept Settings:")
+                calling_info.get_intercept_settings(progress)
                 progress.console.print(f"--- Found [green]Outbound Intercept Settings[/] for each number")
 
             # Populate DF with report info
-            df_report2 = populate_df(calling_info, 2, df_report2)
+            df_report2 = populate_df(calling_info, 2)
 
             ### REPORT 3 ###
-            progress.console.print("- Generating [blue]Report 3[/]:")
+            progress.console.print("\n- Generating [blue]Report 3[/]:")
+            error_logger.info("\n- Generating Report 3:")
 
             # Gather Trunk Information
-            calling_info.get_trunks()
+            error_logger.info("-- Calling Trunks:")
+            calling_info.get_trunks(progress)
 
             if len(calling_info.trunks) == 0:
                 progress.console.print("-- [red]No Webex Calling Trunks found.[/]")
@@ -353,28 +388,76 @@ def generate_calling_report(token):
                     f"-- Found [green]Webex Calling Trunks[/]: {calling_info.trunks}")
 
             # Populate DF with report info
-            df_report3 = populate_df(calling_info, 3, df_report3)
+            df_report3 = populate_df(calling_info, 3)
 
             counter += 1
             progress.update(overall_progress, advance=1)
 
-    # Save the updated DataFrame(s) to the new Excel file
-    with pd.ExcelWriter(destination_file, engine="openpyxl", mode='a', if_sheet_exists='overlay') as writer:
-        df_report1.to_excel(writer, sheet_name='Report #1', startrow=1, index=False, header=False)
+            # Cleanup Intermediate progress displays (ignore first task -> overall task)
+            task_ids = progress.task_ids
+            task_ids.pop(0)
+            for task_id in task_ids:
+                progress.remove_task(task_id)
 
-    with pd.ExcelWriter(destination_file, engine="openpyxl", mode='a', if_sheet_exists='overlay') as writer:
-        df_report2.to_excel(writer, sheet_name='Report #2', startrow=1, index=False, header=False)
+    console.print(Panel.fit("Saving File (Sending Email)", title="Step 3"))
 
-    with pd.ExcelWriter(destination_file, engine="openpyxl", mode='a', if_sheet_exists='overlay') as writer:
-        df_report3.to_excel(writer, sheet_name='Report #3', startrow=1, index=False, header=False)
+    if config.CSV_FORMAT:
+        # Create 3 CSV reports, combine them into a folder, and zip the folder
 
-    # If Send Email enabled, it's assumed email configured correctly (file will be deleted after sending email)
+        # Define base naming convention for CSV files, create temp directory
+        base_name = f"calling_report_{date_string}"
+        os.makedirs(base_name, exist_ok=True)
+
+        # Write out to CSV files within temp directory created
+        df_report1.to_csv(os.path.join(base_name, f'{base_name}_1.csv'), index=False)
+        df_report2.to_csv(os.path.join(base_name, f'{base_name}_2.csv'), index=False)
+        df_report3.to_csv(os.path.join(base_name, f'{base_name}_3.csv'), index=False)
+
+        # Zip up the directory
+        shutil.make_archive(base_name, 'zip', base_name)
+
+        # Clean up - remove the original directory
+        shutil.rmtree(base_name)
+
+        # Destination file = zip file, receive same moving and email treatment
+        destination_file = f"{base_name}.zip"
+
+    else:
+        # Output reports in condensed Excel format (based on template file)
+        destination_file = f"calling_report_{date_string}.xlsx"
+
+        # Create New Report based on template (date-stamped clone)
+        shutil.copy(REPORT_TEMPLATE, destination_file)
+
+        with pd.ExcelWriter(destination_file, engine="openpyxl", mode='a', if_sheet_exists='overlay') as writer:
+            df_report1.to_excel(writer, sheet_name='Report #1', startrow=1, index=False, header=False)
+
+        with pd.ExcelWriter(destination_file, engine="openpyxl", mode='a', if_sheet_exists='overlay') as writer:
+            df_report2.to_excel(writer, sheet_name='Report #2', startrow=1, index=False, header=False)
+
+        with pd.ExcelWriter(destination_file, engine="openpyxl", mode='a', if_sheet_exists='overlay') as writer:
+            df_report3.to_excel(writer, sheet_name='Report #3', startrow=1, index=False, header=False)
+
+    console.print(f'New report file created: `[blue]{destination_file}[/]`')
+
+    if config.DESTINATION_PATH != '' and os.path.exists(config.DESTINATION_PATH):
+        # if destination path defined, check if path exists, then move the file if successful
+        new_path = shutil.move(destination_file, os.path.join(config.DESTINATION_PATH, destination_file))
+        console.print(f"Saving File to [green]{new_path}[/]")
+
+    else:
+        # Create the default reports directory if it doesn't exist
+        new_folder_path = os.path.join(os.getcwd(), 'reports')
+        os.makedirs(new_folder_path, exist_ok=True)
+
+        # Move the Excel file to the destination
+        new_path = shutil.move(destination_file, os.path.join(new_folder_path, destination_file))
+        console.print(f"Saving File to [green]{new_path}[/]")
+
+    # Note: If Send Email enabled, it's assumed email configured correctly
     if config.SEND_EMAIL:
         # Send Email with report attached, sends email to recipient list configured
-        send_email_with_attachment(destination_file)
-
-        # Delete Report File after sending via Email
-        os.remove(destination_file)
+        send_email_with_attachment(new_path)
 
 
 def main():
