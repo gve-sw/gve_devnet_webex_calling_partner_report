@@ -33,6 +33,7 @@ class WebexCallingInfo:
         self.headers = {'Authorization': f'Bearer {token}'}
         self.console = console if console else Console()
         self.error_logger = error_logger if error_logger else None
+        self.error_flag = False
         self.id = id
         self.org_id = None
         self.displayName = displayName
@@ -66,6 +67,7 @@ class WebexCallingInfo:
                 self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
                 self.error_logger.error(response.text)
 
+            self.error_flag = True
             return None
 
     def get_org_id(self):
@@ -242,6 +244,8 @@ class WebexCallingInfo:
                     if self.error_logger:
                         self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
                         self.error_logger.error(response.text)
+
+                    self.error_flag = True
         else:
             self.console.print("[red]Request FAILED: " + str(response.status_code))
             self.console.print(response.text)
@@ -250,6 +254,8 @@ class WebexCallingInfo:
             if self.error_logger:
                 self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
                 self.error_logger.error(response.text)
+
+            self.error_flag = True
 
     def get_phone_numbers(self):
         """
