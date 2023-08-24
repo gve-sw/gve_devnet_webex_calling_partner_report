@@ -61,11 +61,13 @@ class WebexCallingInfo:
         else:
             self.console.print("\n[red]Request FAILED: [/]" + str(response.status_code))
             self.console.print(response.text)
+            self.console.print(f"API Response Headers: {response.headers}")
 
             # Write Errors to File
             if self.error_logger:
                 self.error_logger.error("\nRequest FAILED: " + str(response.status_code))
                 self.error_logger.error(response.text)
+                self.error_logger.error(f"API Response Headers: {response.headers}")
 
             self.error_flag = True
             return None

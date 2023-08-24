@@ -118,6 +118,8 @@ def get_customer_orgs(token, file_logger):
 
         console.print(f'Found {len(orgs) - 1 if len(orgs) > 1 else len(orgs)} org(s)!')
         file_logger.info(f'Found {len(orgs) - 1 if len(orgs) > 1 else len(orgs)} org(s)!')
+        console.print(f"API Response Headers: {response.headers}")
+
         return orgs
     else:
         console.print("[red]Request FAILED: " + str(response.status_code))
@@ -175,7 +177,7 @@ def populate_df(calling_info, report_number, df):
                                'Outgoing Call Permissions': '', 'Internal': '',
                                'Toll-free': '', 'National': '', 'International': '',
                                'Operator Assistance': '', 'Chargeable Directory Assistance': '',
-                               'Special Services I': '', 'Special Services II': '', 'Premium Service I': '',
+                               'Special Services I': '', 'Special Services II': '', 'Premium Services I': '',
                                'Premium Services II': '', 'Call Intercept': '',
                                'Outgoing Intercept Permissions': ''}]))
         else:
@@ -438,6 +440,9 @@ def generate_calling_report(token):
 
     # Use error log flag, append 'clean' or 'error' to log file name
     file_path = file_logger.handlers[0].baseFilename
+
+    # Close file logger for log file
+    file_logger.removeHandler(file_logger.handlers[0])
 
     if error_flag:
         new_file_name = 'error_' + os.path.basename(file_path)
