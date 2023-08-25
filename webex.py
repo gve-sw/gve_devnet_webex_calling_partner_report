@@ -29,14 +29,14 @@ base_url = 'https://webexapis.com/v1/'
 
 
 class WebexCallingInfo:
-    def __init__(self, token, id, displayName, console, error_logger):
+    def __init__(self, token, id, org_name, console, error_logger):
         self.headers = {'Authorization': f'Bearer {token}'}
         self.console = console if console else Console()
         self.error_logger = error_logger if error_logger else None
         self.error_flag = False
         self.id = id
         self.org_id = None
-        self.displayName = displayName
+        self.displayName = org_name
         self.trunks = []
         self.professional_licenses = {}
         self.workspace_licenses = {}
@@ -72,6 +72,17 @@ class WebexCallingInfo:
             self.error_flag = True
             return None
 
+    def get_org_details(self):
+        """
+        Get Webex Control Hub Org API id and name, necessary for proper scope and permissions to avoid 403 errors
+        """
+        # Get org name and details
+        org_url = f"organizations/{self.id}"
+        response = self.get_wrapper(org_url, {})
+
+        if response:
+            self.displayName = response['displayName']
+
     def get_org_id(self):
         """
         Get Webex Control Hub Org id (different from API Org ID). ID is base64 encoded, with additional encoded
@@ -87,7 +98,6 @@ class WebexCallingInfo:
         """
         Get a list of configured Trunks, retrieve Route Groups associated with Trunks as well
         """
-
         # Get a List of configured Trunks
         trunk_url = "telephony/config/premisePstn/trunks"
         trunk_params = {'orgId': self.id}

@@ -326,6 +326,9 @@ def generate_calling_report(token):
             # Initialize object which will hold org-wide calling info for generating various reports
             calling_info = WebexCallingInfo(token, org['id'], org['displayName'], progress.console, file_logger)
 
+            # Get Org Name
+            calling_info.get_org_details()
+
             # Get Webex Org Id
             calling_info.get_org_id()
 
