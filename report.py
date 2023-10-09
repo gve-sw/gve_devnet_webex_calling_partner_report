@@ -196,26 +196,28 @@ def populate_df(calling_info, report_number, df):
 
                 if number['owner_id'] != '':
                     # Grab outgoing call permission data
-                    permissions = calling_info.outgoing_permissions[number['owner_id']]
-                    df_row['Outgoing Call Permissions'] = permissions['outgoing_call_permissions']
+                    if number['owner_id'] in calling_info.outgoing_permissions:
+                        permissions = calling_info.outgoing_permissions[number['owner_id']]
+                        df_row['Outgoing Call Permissions'] = permissions['outgoing_call_permissions']
 
-                    # If custom settings enabled, record those settings
-                    if df_row['Outgoing Call Permissions'] == 'Custom Settings':
-                        df_row['Internal'] = permissions['internal']
-                        df_row['Toll-free'] = permissions['toll_free']
-                        df_row['National'] = permissions['national']
-                        df_row['International'] = permissions['international']
-                        df_row['Operator Assistance'] = permissions['operator_assistance']
-                        df_row['Chargeable Directory Assistance'] = permissions['chargeable_directory_assistance']
-                        df_row['Special Services I'] = permissions['special_services_1']
-                        df_row['Special Services II'] = permissions['special_services_2']
-                        df_row['Premium Services I'] = permissions['premium_services_1']
-                        df_row['Premium Services II'] = permissions['premium_services_2']
+                        # If custom settings enabled, record those settings
+                        if df_row['Outgoing Call Permissions'] == 'Custom Settings':
+                            df_row['Internal'] = permissions['internal']
+                            df_row['Toll-free'] = permissions['toll_free']
+                            df_row['National'] = permissions['national']
+                            df_row['International'] = permissions['international']
+                            df_row['Operator Assistance'] = permissions['operator_assistance']
+                            df_row['Chargeable Directory Assistance'] = permissions['chargeable_directory_assistance']
+                            df_row['Special Services I'] = permissions['special_services_1']
+                            df_row['Special Services II'] = permissions['special_services_2']
+                            df_row['Premium Services I'] = permissions['premium_services_1']
+                            df_row['Premium Services II'] = permissions['premium_services_2']
 
                     # Grab Outgoing intercept permissions
-                    intercept = calling_info.intercept_settings[number['owner_id']]
-                    df_row['Call Intercept'] = intercept['call_intercept']
-                    df_row['Outgoing Intercept Permissions'] = intercept['outgoing_permissions']
+                    if number['owner_id'] in calling_info.intercept_settings:
+                        intercept = calling_info.intercept_settings[number['owner_id']]
+                        df_row['Call Intercept'] = intercept['call_intercept']
+                        df_row['Outgoing Intercept Permissions'] = intercept['outgoing_permissions']
 
                 rows.append(pd.DataFrame([df_row]))
 
