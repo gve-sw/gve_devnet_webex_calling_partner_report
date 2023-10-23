@@ -325,6 +325,9 @@ def generate_calling_report(token):
             if org['displayName'] == config.PARTNER_ORG_NAME:
                 continue
 
+            progress.console.print(f"\n--------------------------------------------------------------------------------")
+            file_logger.info(f"\n--------------------------------------------------------------------------------")
+
             # Initialize object which will hold org-wide calling info for generating various reports
             calling_info = WebexCallingInfo(token, org['id'], org['displayName'], progress.console, file_logger)
 

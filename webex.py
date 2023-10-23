@@ -59,9 +59,22 @@ class WebexCallingInfo:
         if response.ok:
             return response.json()
         else:
+            # Elevated permissions may have expired, attempt to regain permissions with org/id call (once)
+            if response.status_code == 403:
+                org_details_url = f"{base_url}/organizations/{self.id}"
+                response = requests.get(url=org_details_url, headers=self.headers, params={})
+
+                # Make original request
+                response = requests.get(url=target_url, headers=self.headers, params=params)
+
+                # If response is ok, permissions reset, return response
+                if response.ok:
+                    return response.json()
+
+            # Print failure message (error is either not a 403 error or not resolved via 403 fix)
             self.console.print("\n[red]Request FAILED: [/]" + str(response.status_code))
             self.console.print(response.text)
-            self.console.print(f"API Response Headers: {response.headers}")
+            self.console.print(f"\nAPI Response Headers: {response.headers}")
 
             # Write Errors to File
             if self.error_logger:
