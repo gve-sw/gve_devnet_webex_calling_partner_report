@@ -74,37 +74,42 @@ A detailed guide is included [here](https://apiconsole.cisco.com/docs/read/overv
 
 ## Installation/Configuration
 1. Clone this repository with `git clone [repository name]`
-2. Add the Webex App Key and App Secret to `config.py` from the prerequisites section. Add the Name of the Webex Partner Org as well - found in the Account Tab (**this prevents processing of the partner org itself in the API calls**)
+2. Rename the `.env_sample` file to `.env`. Rename `config_sample.py` to `config.py`.
+3. Add the Webex App Key and App Secret to `.env` from the prerequisites section. Add the Name of the Webex Partner Org (`config.py`) as well - found in the Account Tab (**this prevents processing of the partner org itself in the API calls**)
+```dotenv
+WEBEX_CLIENT_ID=""
+WEBEX_CLIENT_SECRET=""
+```
 ```python
-WEBEX_CLIENT_ID = ""
-WEBEX_CLIENT_SECRET = ""
 PARTNER_ORG_NAME = ""
 ```
-3. If you'd like to leverage the email capability, ensure `CCW_INTEGRATION` is set to True. Add the CCW App Key and App Secret to `config.py` from the prerequisites section (if relevant).
+4. If you'd like to leverage the email capability, ensure `CCW_INTEGRATION` is set to True (`config.py`). Add the CCW App Key and App Secret to `.env` from the prerequisites section (if relevant).
+```dotenv
+CCW_CLIENT_ID=""
+CCW_CLIENT_SECRET=""
+```
 ```python
 CCW_INTEGRATION = False
-CCW_CLIENT_ID = ""
-CCW_CLIENT_SECRET = ""
 ```
-4. Enter a file path where the report file should be saved. If left blank, the report file will be saved to the default `./reports/{report_name}` path in the current directory. Select the format of the report file (CSV or Excel). The default format is an Excel File with 3 sheets, but a zip of 3 CSV files is also supported.
+5. Enter a file path where the report file should be saved. If left blank, the report file will be saved to the default `./reports/{report_name}` path in the current directory. Select the format of the report file (CSV or Excel). The default format is an Excel File with 3 sheets, but a zip of 3 CSV files is also supported.
 ```python
 DESTINATION_PATH = ""
 CSV_FORMAT = False
 ```
-5. If you'd like to leverage the email capability, ensure `SEND_EMAIL` is set to True. Add the Email Username and Password  `config.py` from the prerequisites section for the relevant Email provider (if enabled).
+6. If you'd like to leverage the email capability, ensure `SEND_EMAIL` is set to True. Add the Email Username and Password to `.env` from the prerequisites section for the relevant Email provider (if enabled).
+```dotenv
+EMAIL_USERNAME=""
+EMAIL_PASSWORD=""
+```
 ```python
 SEND_EMAIL = False
-
-# Outlook/GMail:
-EMAIL_USERNAME = ""
-EMAIL_PASSWORD = ""
 ```
-6. Add the list of 1 or more Email Recipients to `config.py` from the prerequisites section (if relevant).
+7. Add the list of 1 or more Email Recipients to `config.py` from the prerequisites section (if relevant).
 ```python
 RECIPIENTS = ['example@email.com']
 ```
-7. Set up a Python virtual environment. Make sure Python 3 is installed in your environment, and if not, you may download Python [here](https://www.python.org/downloads/). Once Python 3 is installed in your environment, you can activate the virtual environment with the instructions found [here](https://docs.python.org/3/tutorial/venv.html).
-8. Install the requirements with `pip3 install -r requirements.txt`
+8. Set up a Python virtual environment. Make sure Python 3 is installed in your environment, and if not, you may download Python [here](https://www.python.org/downloads/). Once Python 3 is installed in your environment, you can activate the virtual environment with the instructions found [here](https://docs.python.org/3/tutorial/venv.html).
+9. Install the requirements with `pip3 install -r requirements.txt`
 
 ## Usage
 To generate a report, there are 2 important scripts: `app.py` and `report.py`.

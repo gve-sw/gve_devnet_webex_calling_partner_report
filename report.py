@@ -18,12 +18,12 @@ __copyright__ = "Copyright (c) 2023 Cisco and/or its affiliates."
 __license__ = "Cisco Sample Code License, Version 1.1"
 
 import json
+import logging
 import os
 import shutil
 import smtplib
 import sys
 import time
-import logging
 from datetime import date, datetime
 from email import encoders
 from email.mime.base import MIMEBase
@@ -32,6 +32,7 @@ from email.mime.text import MIMEText
 
 import pandas as pd
 import requests
+from dotenv import load_dotenv
 from requests_oauthlib import OAuth2Session
 from rich.console import Console
 from rich.panel import Panel
@@ -42,7 +43,6 @@ from webex import WebexCallingInfo
 
 # Refreshing token URL
 TOKEN_URL = 'https://api.ciscospark.com/v1/access_token'
-
 REPORT_TEMPLATE = "calling_report_template.xlsx"
 
 # Rich console instance
@@ -50,6 +50,14 @@ console = Console()
 
 # Specify list of Org names to specifically process (only these orgs will be processed)
 ORGS = []
+
+# Load env variables
+load_dotenv()
+WEBEX_CLIENT_ID = os.getenv("WEBEX_CLIENT_ID")
+WEBEX_CLIENT_SECRET = os.getenv("WEBEX_CLIENT_SECRET")
+WEBEX_CLIENT_SECRET = os.getenv("WEBEX_CLIENT_SECRET")
+EMAIL_USERNAME = os.getenv("EMAIL_USERNAME")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 
 def custom_logger(date):
@@ -83,11 +91,11 @@ def refresh_token(tokens):
     """
     refresh_token = tokens['refresh_token']
     extra = {
-        'client_id': config.WEBEX_CLIENT_ID,
-        'client_secret': config.WEBEX_CLIENT_SECRET,
+        'client_id': WEBEX_CLIENT_ID,
+        'client_secret': WEBEX_CLIENT_SECRET,
         'refresh_token': refresh_token,
     }
-    auth_code = OAuth2Session(config.WEBEX_CLIENT_ID, token=tokens)
+    auth_code = OAuth2Session(WEBEX_CLIENT_ID, token=tokens)
     new_teams_token = auth_code.refresh_token(TOKEN_URL, **extra)
 
     # store away the new token
@@ -253,7 +261,7 @@ def send_email_with_attachment(attachment_path, file_logger):
 
     # Create the email message
     msg = MIMEMultipart()
-    msg['From'] = config.EMAIL_USERNAME
+    msg['From'] = EMAIL_USERNAME
     msg['To'] = ','.join(config.RECIPIENTS)
     msg['Subject'] = subject
 
@@ -273,7 +281,7 @@ def send_email_with_attachment(attachment_path, file_logger):
     # Establish the SMTP connection and send the email
     with smtplib.SMTP(config.SMTP_DOMAIN, config.SMTP_PORT) as server:
         server.starttls()
-        server.login(config.EMAIL_USERNAME, config.EMAIL_PASSWORD)
+        server.login(EMAIL_USERNAME, EMAIL_PASSWORD)
         server.send_message(msg)
 
     console.print(f'Email sent successfully to [yellow]{config.RECIPIENTS}[/]')
@@ -325,7 +333,8 @@ def generate_calling_report(token):
             if org['displayName'] == config.PARTNER_ORG_NAME:
                 continue
 
-            progress.console.print(f"\n--------------------------------------------------------------------------------")
+            progress.console.print(
+                f"\n--------------------------------------------------------------------------------")
             file_logger.info(f"\n--------------------------------------------------------------------------------")
 
             # Initialize object which will hold org-wide calling info for generating various reports

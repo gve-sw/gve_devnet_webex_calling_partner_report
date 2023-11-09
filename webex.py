@@ -18,12 +18,16 @@ __copyright__ = "Copyright (c) 2023 Cisco and/or its affiliates."
 __license__ = "Cisco Sample Code License, Version 1.1"
 
 import base64
-
 import requests
+import os
 from datetime import datetime
 from rich.console import Console
+from dotenv import load_dotenv
 
-import config
+# Load env variables
+load_dotenv()
+CCW_CLIENT_ID = os.getenv("CCW_CLIENT_ID")
+CCW_CLIENT_SECRET = os.getenv("CCW_CLIENT_SECRET")
 
 base_url = 'https://webexapis.com/v1/'
 
@@ -210,8 +214,8 @@ class WebexCallingInfo:
             'content-type': "application/x-www-form-urlencoded",
             'cache-control': "no-cache"
         }
-        payload = "client_id=" + config.CCW_CLIENT_ID + \
-                  "&client_secret=" + config.CCW_CLIENT_SECRET + \
+        payload = "client_id=" + CCW_CLIENT_ID + \
+                  "&client_secret=" + CCW_CLIENT_SECRET + \
                   "&grant_type=client_credentials"
 
         response = requests.request("POST", url, data=payload, headers=headers)
