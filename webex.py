@@ -122,7 +122,7 @@ class WebexCallingInfo:
         response = self.get_wrapper(trunk_url, trunk_params)
 
         if response:
-            trunks = response['trunks']
+            trunks = response.get('trunks', [])
 
             if progress:
                 # Optional progress display
@@ -131,8 +131,8 @@ class WebexCallingInfo:
             # Add Trunks to list, determine if trunk is attached to Route Group
             for trunk in trunks:
                 trunk_info = {
-                    "name": trunk['name'],
-                    "id": trunk['id'],
+                    "name": trunk.get('name', ''),
+                    "id": trunk.get('id', ''),
                     'rg_names': []
                 }
 
@@ -167,12 +167,12 @@ class WebexCallingInfo:
         response = self.get_wrapper(license_url, license_params)
 
         if response:
-            licenses = response['items']
+            licenses = response.get('items', [])
 
             # Extract Webex Calling professional and workspaces license specifically
             for license in licenses:
                 # Webex Calling - Workspaces case
-                if license['name'] == "Webex Calling - Workspaces":
+                if license.get('name', '') == "Webex Calling - Workspaces":
                     # If license already present, sum
                     if 'provisioned' in self.workspace_licenses and 'booked' in self.workspace_licenses:
                         self.workspace_licenses['provisioned'] += license['consumedUnits']
@@ -188,7 +188,7 @@ class WebexCallingInfo:
                             self.sub_ids.append(license['subscriptionId'])
 
                 # Webex Calling - Professional case
-                if license['name'] == "Webex Calling - Professional":
+                if license.get('name', '') == "Webex Calling - Professional":
                     # If license already present, sum
                     if 'provisioned' in self.professional_licenses and 'booked' in self.professional_licenses:
                         self.professional_licenses['provisioned'] += license['consumedUnits']
@@ -298,7 +298,7 @@ class WebexCallingInfo:
         response = self.get_wrapper(numbers_url, numbers_params)
 
         if response:
-            numbers = response['phoneNumbers']
+            numbers = response.get('phoneNumbers', [])
 
             # Iterate through numbers across an organization, extract out relevant fields
             for number in numbers:
@@ -348,6 +348,20 @@ class WebexCallingInfo:
             task = progress.add_task("Find Outbound Calling Permissions",
                                                               total=len(self.phone_numbers), transient=True)
 
+        # Map of returned custom settings to internal representation
+        callType_mapping = {
+            'INTERNAL_CALL': 'internal',
+            'TOLL_FREE': 'toll_free',
+            'NATIONAL': 'national',
+            'INTERNATIONAL': 'international',
+            'OPERATOR_ASSISTED': 'operator_assistance',
+            'CHARGEABLE_DIRECTORY_ASSISTED': 'chargeable_directory_assistance',
+            'SPECIAL_SERVICES_I': 'special_services_1',
+            'SPECIAL_SERVICES_II': 'special_services_2',
+            'PREMIUM_SERVICES_I': 'premium_services_1',
+            'PREMIUM_SERVICES_II': 'premium_services_2'
+        }
+
         # Get the outbound call permissions for each user
         for phone_number in self.phone_numbers:
             # If the phone number is assigned to a user, grab the permissions by user id
@@ -372,40 +386,18 @@ class WebexCallingInfo:
                     }
 
                     # Custom settings enabled, extract individual settings
-                    if response['useCustomEnabled']:
+                    if response.get('useCustomEnabled', False) or response.get('useCustomPermissions', False):
                         number_permissions['outgoing_call_permissions'] = 'Custom Settings'
 
-                        permissions = response['callingPermissions']
+                        permissions = response.get('callingPermissions', [])
                         for permission in permissions:
-                            if permission['callType'] == 'INTERNAL_CALL':
-                                number_permissions['internal'] = permission['action'].title()
+                            callType = permission.get('callType', '')
+                            action = permission.get('action', 'Unknown')
 
-                            if permission['callType'] == 'TOLL_FREE':
-                                number_permissions['toll_free'] = permission['action'].title()
+                            # Use dictionary mapping to handle the assignment
+                            if callType in callType_mapping:
+                                number_permissions[callType_mapping[callType]] = action.title()
 
-                            if permission['callType'] == 'NATIONAL':
-                                number_permissions['national'] = permission['action'].title()
-
-                            if permission['callType'] == 'INTERNATIONAL':
-                                number_permissions['international'] = permission['action'].title()
-
-                            if permission['callType'] == 'OPERATOR_ASSISTED':
-                                number_permissions['operator_assistance'] = permission['action'].title()
-
-                            if permission['callType'] == 'CHARGEABLE_DIRECTORY_ASSISTED':
-                                number_permissions['chargeable_directory_assistance'] = permission['action'].title()
-
-                            if permission['callType'] == 'SPECIAL_SERVICES_I':
-                                number_permissions['special_services_1'] = permission['action'].title()
-
-                            if permission['callType'] == 'SPECIAL_SERVICES_II':
-                                number_permissions['special_services_2'] = permission['action'].title()
-
-                            if permission['callType'] == 'PREMIUM_SERVICES_I':
-                                number_permissions['premium_services_1'] = permission['action'].title()
-
-                            if permission['callType'] == 'PREMIUM_SERVICES_II':
-                                number_permissions['premium_services_2'] = permission['action'].title()
                     else:
                         # Default settings case, no need to record settings
                         number_permissions['outgoing_call_permissions'] = 'Default Settings'
@@ -437,7 +429,7 @@ class WebexCallingInfo:
                     current_intercept_settings = {}
 
                     # Extract Call Intercept settings
-                    if response['enabled']:
+                    if response.get('enabled', False):
                         current_intercept_settings['call_intercept'] = 'Enable'
 
                         outgoing_type = response['outgoing']['type']
